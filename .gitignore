@@ -1,0 +1,6 @@
+# Ignore the Python virtual environment directory
+.venv/
+
+# Some files to help with development
+backup_file.txt
+.ropeproject/

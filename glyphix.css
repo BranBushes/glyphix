@@ -1,0 +1,132 @@
+/*
+================================================================================
+glyphix.css
+--------------------------------------------------------------------------------
+Stylesheet for the Glyphix TUI Music Player.
+This version uses docking to permanently fix the invisible music controls.
+================================================================================
+*/
+
+Screen {
+    background: #0d0d0d;
+    color: #e0e0e0;
+}
+
+/*
+--------------------------------------------------------------------------------
+Main Layout
+--------------------------------------------------------------------------------
+*/
+#main_container {
+    layout: grid;
+    grid-size: 3;
+    grid-columns: 2fr 5fr 4fr;
+    grid-gutter: 1;
+    height: 100%;
+}
+
+/*
+--------------------------------------------------------------------------------
+Panel Styles
+--------------------------------------------------------------------------------
+*/
+#music_tree_panel,
+#player_panel,
+#lyrics_queue_panel {
+    background: #1a1a1a;
+    border: solid #2c2c2c;
+    padding: 1;
+}
+
+#left_panel {
+    padding: 1 0;
+}
+
+#right_panel {
+    display: block;
+}
+
+.folder_tab {
+    width: 100%;
+    height: 3;
+    background: transparent;
+    border: none;
+    margin-bottom: 1;
+}
+
+.folder_tab:hover {
+    background: #444444;
+}
+
+/*
+--------------------------------------------------------------------------------
+Right Panel: Player & Lyrics/Queue
+--------------------------------------------------------------------------------
+*/
+#player_panel {
+    height: 15; /* Reserve a fixed height for the entire player */
+}
+
+#player_top_section {
+    height: auto;
+    align: center middle;
+}
+
+#album_art {
+    width: 30%;
+    height: 10;
+    content-align: center middle;
+    color: #666666;
+    margin-right: 2;
+    border: solid #2c2c2c;
+}
+
+#track_info {
+    width: 70%;
+}
+
+#music_name {
+    content-align: center middle;
+    margin-bottom: 1;
+}
+
+#lyrics_queue_panel {
+    height: 1fr;
+    margin-top: 1;
+    content-align: center middle;
+}
+
+/*
+--------------------------------------------------------------------------------
+Widgets: Controls & Slider
+--------------------------------------------------------------------------------
+*/
+#seek_slider {
+    background: #1a1a1a;
+}
+
+/* FIX: Dock the music controls to the bottom of the player panel. */
+#music_controls {
+    dock: bottom; /* This anchors the container to the bottom of its parent. */
+    height: 3; /* We give it an explicit height for the buttons. */
+    align-horizontal: center; /* This centers the buttons inside the container. */
+    width: 100%;
+}
+
+#music_controls Button {
+    min-width: 5;
+    height: 3;
+    background: transparent;
+    border: none;
+    color: #c0c0c0;
+}
+
+#music_controls Button:hover,
+#music_controls Button:focus {
+    background: transparent;
+    color: #ff4500;
+}
+
+Footer {
+    background: #2c2c2c;
+}
