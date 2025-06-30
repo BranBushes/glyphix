@@ -1,14 +1,12 @@
 /*
-================================================================================
-glyphix.css
 --------------------------------------------------------------------------------
-Stylesheet for the Glyphix TUI Music Player.
-This version uses docking to permanently fix the invisible music controls.
-================================================================================
+Global & Screen Styles
+--------------------------------------------------------------------------------
 */
-
 Screen {
+    /* A very dark background, almost black, for the main app window */
     background: #0d0d0d;
+    /* A light grey for default text, providing good contrast */
     color: #e0e0e0;
 }
 
@@ -20,7 +18,9 @@ Main Layout
 #main_container {
     layout: grid;
     grid-size: 3;
+    /* Columns: Left (narrow), Middle (wide), and Right (medium) */
     grid-columns: 2fr 5fr 4fr;
+    background: #0d0d0d;
     grid-gutter: 1;
     height: 100%;
 }
@@ -30,32 +30,50 @@ Main Layout
 Panel Styles
 --------------------------------------------------------------------------------
 */
+
+/* Shared styles for the primary content panels */
 #music_tree_panel,
 #player_panel,
 #lyrics_queue_panel {
+    /* A dark grey surface, slightly lighter than the app background */
     background: #1a1a1a;
+    /* A subtle, darker grey border to define panel edges */
     border: solid #2c2c2c;
     padding: 1;
 }
 
 #left_panel {
+    /* Vertical padding for the tab container */
     padding: 1 0;
 }
 
 #right_panel {
+    /* This rule ensures children stack vertically. */
     display: block;
 }
 
+/*
+--------------------------------------------------------------------------------
+Left Panel: Music Folder Tabs
+--------------------------------------------------------------------------------
+*/
 .folder_tab {
     width: 100%;
     height: 3;
     background: transparent;
+    content-align: center middle;
     border: none;
     margin-bottom: 1;
 }
 
 .folder_tab:hover {
+    /* A medium grey for hover feedback */
     background: #444444;
+}
+
+.folder_tab.active {
+    /* A lighter grey background indicates the active tab */
+    background: #2e2e2e;
 }
 
 /*
@@ -64,7 +82,8 @@ Right Panel: Player & Lyrics/Queue
 --------------------------------------------------------------------------------
 */
 #player_panel {
-    height: 15; /* Reserve a fixed height for the entire player */
+    /* A fixed height ensures the player is always visible */
+    height: 15;
 }
 
 #player_top_section {
@@ -91,7 +110,7 @@ Right Panel: Player & Lyrics/Queue
 }
 
 #lyrics_queue_panel {
-    height: 1fr;
+    height: 1fr; /* Takes up the remaining vertical space */
     margin-top: 1;
     content-align: center middle;
 }
@@ -105,11 +124,11 @@ Widgets: Controls & Slider
     background: #1a1a1a;
 }
 
-/* FIX: Dock the music controls to the bottom of the player panel. */
 #music_controls {
-    dock: bottom; /* This anchors the container to the bottom of its parent. */
-    height: 3; /* We give it an explicit height for the buttons. */
-    align-horizontal: center; /* This centers the buttons inside the container. */
+    /* Docking ensures the controls are always at the bottom of the player panel */
+    dock: bottom;
+    height: 3;
+    align-horizontal: center; /* Center the buttons inside */
     width: 100%;
 }
 
@@ -118,6 +137,7 @@ Widgets: Controls & Slider
     height: 3;
     background: transparent;
     border: none;
+    /* A light color for visibility against the dark background */
     color: #c0c0c0;
 }
 
@@ -127,6 +147,58 @@ Widgets: Controls & Slider
     color: #ff4500;
 }
 
+/*
+--------------------------------------------------------------------------------
+Footer
+--------------------------------------------------------------------------------
+*/
 Footer {
     background: #2c2c2c;
+}
+
+Footer > .footer--key {
+    color: #e0e0e0;
+    text-style: bold;
+}
+
+Footer > .footer--description {
+    color: #a0a0a0;
+}
+
+/*
+--------------------------------------------------------------------------------
+Custom Modal Dialog (For Folder Selection)
+--------------------------------------------------------------------------------
+*/
+#select_directory_dialog {
+    width: 80%;
+    height: 80%;
+    background: #2c2c2c;
+    border: thick #444444;
+    padding: 1;
+    align: center middle;
+}
+
+#select_directory_dialog Label {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+    text-style: bold;
+}
+
+#select_directory_tree {
+    background: #1a1a1a;
+    border: solid #0d0d0d;
+    height: 1fr; /* Take up all available space */
+}
+
+#select_directory_buttons {
+    width: 100%;
+    height: auto;
+    align-horizontal: right;
+    padding-top: 1;
+}
+
+#select_directory_buttons Button {
+    margin-left: 2;
 }
