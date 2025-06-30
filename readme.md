@@ -88,7 +88,7 @@ python3 -m venv .venv
 source .venv/bin/activate
 
 # 3. Install the required libraries
-pip install -r requirements.txt # You will need to create this file
+pip install -r requirements.txt
 
 # 4. Run the application
 python3 glyphix.py
