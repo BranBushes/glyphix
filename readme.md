@@ -80,7 +80,7 @@ Keybindings are designed for quick and easy access to all features.
 To set up a development environment and run the application:
 ```bash
 # 1. Clone the repository
-git clone https://github.com/your-username/glyphix.git
+git clone https://github.com/BranBushes/glyphix.git
 cd glyphix
 
 # 2. Create and activate a virtual environment
