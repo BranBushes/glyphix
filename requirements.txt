@@ -1,9 +1,7 @@
 beautifulsoup4==4.13.4
 certifi==2025.6.15
-cffi==1.17.1
 charset-normalizer==3.4.2
 idna==3.10
-just_playback==0.1.8
 linkify-it-py==2.0.3
 lyricsgenius==3.6.4
 markdown-it-py==3.0.0
@@ -12,15 +10,13 @@ mdurl==0.1.2
 mutagen==1.47.0
 pillow==10.4.0
 platformdirs==4.3.8
-pycparser==2.22
 Pygments==2.19.2
+python-mpv==1.0.8
 requests==2.32.4
 rich==14.0.0
 soupsieve==2.7
 term-image==0.7.2
 textual==3.5.0
-textual-slider==0.2.0
-tinytag==2.1.1
 typing_extensions==4.14.0
 uc-micro-py==1.0.3
 urllib3==2.5.0

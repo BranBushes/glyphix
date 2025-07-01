@@ -202,3 +202,16 @@ Custom Modal Dialog (For Folder Selection)
 #select_directory_buttons Button {
     margin-left: 2;
 }
+
+/*
+--------------------------------------------------------------------------------
+Debug Log Panel
+--------------------------------------------------------------------------------
+*/
+.log-panel {
+    height: 12;
+    margin-top: 1;
+    padding: 1;
+    border: round white;
+    background: #1a1a1a;
+}

@@ -1,10 +1,11 @@
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Optional
+from collections import deque
 
-from just_playback import Playback
-
+import mpv
 from rich.text import Text
+
 from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
@@ -104,8 +105,6 @@ MUSIC_PATH = Path(os.path.expanduser("~/Music"))
 class GlyphixApp(App):
     CSS_PATH = "glyphix.css"
 
-    # FIX: Add 'priority=True' to the space binding. This ensures it's always
-    # active and visible in the footer, even when DirectoryTree is focused.
     BINDINGS = [
         Binding("space", "play_pause", "Play/Pause", priority=True),
         Binding("n", "next_track", "Next"),
@@ -120,7 +119,38 @@ class GlyphixApp(App):
 
     def __init__(self):
         super().__init__()
-        self.playback = Playback()
+        self.debug_log_messages = deque(maxlen=10)
+        self.playback = mpv.MPV(
+            log_handler=self._log_handler,
+            input_default_bindings=False,
+            idle='yes'
+        )
+        self._is_player_active = False
+        # FIX: Observe the 'filename' property. This reliably detects any track change.
+        self.playback.observe_property('filename', self._on_track_change)
+
+    def _log_handler(self, level: str, prefix: str, text: str) -> None:
+        self.debug_log_messages.append(f"[{level}] {prefix}: {text.strip()}")
+        self.call_from_thread(self._update_debug_log)
+
+    def _update_debug_log(self) -> None:
+        try:
+            log_widget = self.query_one("#debug_log", Static)
+            log_widget.update("\n".join(self.debug_log_messages))
+        except Exception:
+            pass
+
+    def _on_track_change(self, name: str, new_filename: Optional[str]) -> None:
+        """Called by mpv when the currently playing filename changes."""
+        if new_filename:
+            try:
+                # Find the index of the new song in our main playlist
+                new_index = next(i for i, path in enumerate(self.playlist) if path.name == new_filename)
+                self.current_track_index = new_index
+                self.call_from_thread(self.update_track_display)
+            except StopIteration:
+                # Song is not in the current playlist, do nothing.
+                pass
 
     def compose(self) -> ComposeResult:
         yield Header(name="glyphix")
@@ -138,60 +168,75 @@ class GlyphixApp(App):
                         yield Button("🔀",id="shuffle_button"); yield Button("⏮",id="prev_button"); yield Button("▶",id="play_pause_button"); yield Button("⏭",id="next_button"); yield Button("🔁",id="loop_button")
                 with ContentSwitcher(initial="queue_panel", id="lyrics_queue_switcher"):
                     yield QueuePanel(id="queue_panel"); yield LyricsPanel(id="lyrics_panel")
+                yield Static(id="debug_log", classes="log-panel")
         yield Footer()
 
     def on_mount(self) -> None:
         self.add_folder_tab(MUSIC_PATH)
+        self.query_one("#debug_log", Static).border_title = "MPV Log"
         self.set_interval(0.5, self.update_seek_slider)
 
-    def on_unmount(self) -> None: self.playback.stop()
+    def on_unmount(self) -> None:
+        self.playback.terminate()
 
     def play_track(self, track_path: Path):
-        self.playback.stop()
-        self.playback.load_file(str(track_path))
-        self.playback.play()
-        self.query_one("#music_name", Label).update(track_path.stem)
-        self.query_one("#play_pause_button", Button).label = "⏸"
-        slider = self.query_one(SeekSlider)
-        slider.max_value = self.playback.duration if self.playback.duration > 0 else 100
-        self.query_one(QueuePanel).update_queue(self.playlist, self.current_track_index)
+        # FIX: Forcefully play the new track, replacing the old playlist.
+        self.playback.loadfile(str(track_path), mode='replace')
+        self.playback.pause = False
+
+        # Queue up the rest of the songs from the current directory.
+        for i in range(self.current_track_index + 1, len(self.playlist)):
+            self.playback.playlist_append(str(self.playlist[i]))
+
+        self._is_player_active = True
+        # The UI update is now handled by the observer, so we don't call it here.
+
+    def update_track_display(self):
+        """Updates all UI elements related to the current track."""
+        if 0 <= self.current_track_index < len(self.playlist):
+            track_path = self.playlist[self.current_track_index]
+            self.query_one("#music_name", Label).update(track_path.stem)
+            self.query_one("#play_pause_button", Button).label = "⏸"
+
+            slider = self.query_one(SeekSlider)
+            def get_duration():
+                duration = self.playback.duration
+                slider.max_value = float(duration if duration is not None else 100.0)
+            self.set_timer(0.1, get_duration)
+            self.query_one(QueuePanel).update_queue(self.playlist, self.current_track_index)
 
     def update_seek_slider(self) -> None:
-        if self.playback.active:
-            slider = self.query_one(SeekSlider)
-            slider.value = self.playback.curr_pos
-            if not self.playback.playing and self.playback.curr_pos >= self.playback.duration - 0.5:
-                self.action_next_track()
-
-    # The on_key handler is no longer needed. The prioritized binding handles it.
+        if self._is_player_active:
+            duration = self.playback.duration
+            time_pos = self.playback.time_pos
+            if duration is not None and time_pos is not None:
+                slider = self.query_one(SeekSlider)
+                slider.max_value = float(duration)
+                slider.value = float(time_pos)
+            play_pause_button = self.query_one("#play_pause_button", Button)
+            play_pause_button.label = "⏸" if not self.playback.pause else "▶"
 
     def on_seek_slider_seek(self, message: SeekSlider.Seek) -> None:
-        if self.playback.active: self.playback.seek(message.seek_time)
+        if self._is_player_active:
+            self.playback.seek(message.seek_time, reference='absolute')
 
     def action_toggle_lyrics_queue(self) -> None:
         switcher = self.query_one(ContentSwitcher)
         switcher.current = "lyrics_panel" if switcher.current == "queue_panel" else "queue_panel"
 
     def action_play_pause(self) -> None:
-        if self.playback.active:
-            play_pause_button = self.query_one("#play_pause_button", Button)
-            if self.playback.paused:
-                self.playback.resume()
-                play_pause_button.label = "⏸"
-            else:
-                self.playback.pause()
-                play_pause_button.label = "▶"
-        else: self.bell()
+        if self._is_player_active:
+            self.playback.pause = not self.playback.pause
+        else:
+            self.bell()
 
     def action_next_track(self) -> None:
-        if not self.playlist: self.bell(); return
-        self.current_track_index = (self.current_track_index + 1) % len(self.playlist)
-        self.play_track(self.playlist[self.current_track_index])
+        """Tells mpv to play the next track. The observer will handle the UI update."""
+        self.playback.playlist_next()
 
     def action_prev_track(self) -> None:
-        if not self.playlist: self.bell(); return
-        self.current_track_index = (self.current_track_index - 1 + len(self.playlist)) % len(self.playlist)
-        self.play_track(self.playlist[self.current_track_index])
+        """Tells mpv to play the previous track. The observer will handle the UI update."""
+        self.playback.playlist_prev()
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         path = event.path
@@ -200,14 +245,16 @@ class GlyphixApp(App):
         try:
             self.current_track_index = self.playlist.index(path)
             self.play_track(path)
-        except ValueError: pass
+        except ValueError:
+            self._is_player_active = False
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if isinstance(event.button, FolderTab): self.set_active_tab(event.button)
         elif event.button.id == "play_pause_button": self.action_play_pause()
         elif event.button.id == "next_button": self.action_next_track()
         elif event.button.id == "prev_button": self.action_prev_track()
-        else: self.bell()
+        else:
+            self.bell()
 
     def set_active_tab(self, tab: FolderTab) -> None:
         for t in self.query(FolderTab): t.remove_class("active")
@@ -221,7 +268,7 @@ class GlyphixApp(App):
         if make_active: self.set_active_tab(new_tab)
 
     def action_add_folder(self) -> None:
-        def callback(path: Path | None):
+        def callback(path: Optional[Path]):
             if path: self.add_folder_tab(path, True)
         self.push_screen(SelectDirectoryScreen(), callback)
 
