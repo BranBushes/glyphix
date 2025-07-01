@@ -145,6 +145,15 @@ Widgets: Controls & Slider
 #music_controls Button:focus {
     background: transparent;
     color: #ff4500;
+    min-width: 5;
+    height: 3;
+}
+
+/* FIX: Use a red background to match the app's highlight color. */
+#music_controls Button.active {
+    /* A semi-transparent red background indicates the "on" state */
+    background: #ff4500;
+    color: #ff4500;
 }
 
 /*

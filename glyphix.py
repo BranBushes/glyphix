@@ -1,4 +1,5 @@
 import os
+import random
 from pathlib import Path
 from typing import Iterable, Optional
 from collections import deque
@@ -68,8 +69,11 @@ class QueuePanel(Static):
     def compose(self) -> ComposeResult:
         yield Label("Up Next", id="queue_title"); yield ListView(id="queue_list")
     def update_queue(self, playlist: list[Path], current_index: int):
-        queue_list = self.query_one(ListView); queue_list.clear()
-        for track in playlist[current_index + 1:]: queue_list.append(ListItem(Label(track.stem)))
+        queue_list = self.query_one(ListView)
+        queue_list.clear()
+        # Use enumerate, starting from 1, to get a numbered list
+        for i, track in enumerate(playlist[current_index + 1:], start=1):
+            queue_list.append(ListItem(Label(f"{i}. {track.stem}")))
 
 class LyricsPanel(Static):
     def compose(self) -> ComposeResult: yield Label("Lyrics will be shown here.", id="lyrics_placeholder")
@@ -109,13 +113,19 @@ class GlyphixApp(App):
         Binding("space", "play_pause", "Play/Pause", priority=True),
         Binding("n", "next_track", "Next"),
         Binding("p", "prev_track", "Previous"),
+        Binding("s", "toggle_shuffle", "Shuffle"),
+        Binding("r", "toggle_repeat", "Repeat"),
         Binding("a", "add_folder", "Add Folder"),
         Binding("d", "close_folder", "Close Folder"),
         Binding("l", "toggle_lyrics_queue", "Lyrics/Queue"),
         Binding("q", "quit", "Quit"),
     ]
 
-    playlist: list[Path] = []; current_track_index: int = -1
+    playlist: list[Path] = []; original_playlist: list[Path] = []
+    current_track_index: int = -1
+
+    is_shuffled = reactive(False)
+    is_repeat_on = reactive(False)
 
     def __init__(self):
         super().__init__()
@@ -126,7 +136,6 @@ class GlyphixApp(App):
             idle='yes'
         )
         self._is_player_active = False
-        # FIX: Observe the 'filename' property. This reliably detects any track change.
         self.playback.observe_property('filename', self._on_track_change)
 
     def _log_handler(self, level: str, prefix: str, text: str) -> None:
@@ -141,15 +150,12 @@ class GlyphixApp(App):
             pass
 
     def _on_track_change(self, name: str, new_filename: Optional[str]) -> None:
-        """Called by mpv when the currently playing filename changes."""
         if new_filename:
             try:
-                # Find the index of the new song in our main playlist
                 new_index = next(i for i, path in enumerate(self.playlist) if path.name == new_filename)
                 self.current_track_index = new_index
                 self.call_from_thread(self.update_track_display)
             except StopIteration:
-                # Song is not in the current playlist, do nothing.
                 pass
 
     def compose(self) -> ComposeResult:
@@ -179,25 +185,27 @@ class GlyphixApp(App):
     def on_unmount(self) -> None:
         self.playback.terminate()
 
+    def watch_is_shuffled(self, is_shuffled: bool) -> None:
+        """Updates the shuffle button style when the reactive property changes."""
+        self.query_one("#shuffle_button").classes = "active" if is_shuffled else ""
+
+    def watch_is_repeat_on(self, is_repeat_on: bool) -> None:
+        """Updates the mpv repeat property and button style when the reactive property changes."""
+        self.playback.loop_file = 'inf' if is_repeat_on else 'no'
+        self.query_one("#loop_button").classes = "active" if is_repeat_on else ""
+
     def play_track(self, track_path: Path):
-        # FIX: Forcefully play the new track, replacing the old playlist.
         self.playback.loadfile(str(track_path), mode='replace')
         self.playback.pause = False
-
-        # Queue up the rest of the songs from the current directory.
         for i in range(self.current_track_index + 1, len(self.playlist)):
             self.playback.playlist_append(str(self.playlist[i]))
-
         self._is_player_active = True
-        # The UI update is now handled by the observer, so we don't call it here.
 
     def update_track_display(self):
-        """Updates all UI elements related to the current track."""
         if 0 <= self.current_track_index < len(self.playlist):
             track_path = self.playlist[self.current_track_index]
             self.query_one("#music_name", Label).update(track_path.stem)
             self.query_one("#play_pause_button", Button).label = "⏸"
-
             slider = self.query_one(SeekSlider)
             def get_duration():
                 duration = self.playback.duration
@@ -225,23 +233,67 @@ class GlyphixApp(App):
         switcher.current = "lyrics_panel" if switcher.current == "queue_panel" else "queue_panel"
 
     def action_play_pause(self) -> None:
-        if self._is_player_active:
-            self.playback.pause = not self.playback.pause
+        if self._is_player_active: self.playback.pause = not self.playback.pause
+        else: self.bell()
+
+    def action_toggle_shuffle(self) -> None:
+        """Toggles shuffle mode for the playlist without interrupting playback."""
+        self.is_shuffled = not self.is_shuffled
+        if not self.playlist or self.current_track_index == -1:
+            return
+
+        current_song = self.playlist[self.current_track_index]
+        if self.is_shuffled:
+            # When shuffling, save the current playlist order to be restored on un-shuffle.
+            self.original_playlist = self.playlist[:]
+            rest_of_playlist = [p for p in self.playlist if p != current_song]
+            random.shuffle(rest_of_playlist)
+            self.playlist = [current_song] + rest_of_playlist
         else:
-            self.bell()
+            # When un-shuffling, restore the previously saved playlist order.
+            if not self.original_playlist:
+                return
+            self.playlist = self.original_playlist[:]
+
+        self.current_track_index = self.playlist.index(current_song)
+
+        # Rebuild the MPV queue without interrupting the current track.
+        # Calling play_track() here would restart the song. Instead, we
+        # clear the queue and add the new one, leaving the current track untouched.
+        self.playback.playlist_clear()
+        for i in range(self.current_track_index + 1, len(self.playlist)):
+            self.playback.playlist_append(str(self.playlist[i]))
+
+        # Update the queue panel in the UI to reflect the new order.
+        self.query_one(QueuePanel).update_queue(self.playlist, self.current_track_index)
+
+    def action_toggle_repeat(self) -> None:
+        """Toggles repeat mode for the current song."""
+        self.is_repeat_on = not self.is_repeat_on
 
     def action_next_track(self) -> None:
-        """Tells mpv to play the next track. The observer will handle the UI update."""
         self.playback.playlist_next()
 
     def action_prev_track(self) -> None:
-        """Tells mpv to play the previous track. The observer will handle the UI update."""
         self.playback.playlist_prev()
 
     def on_directory_tree_file_selected(self, event: DirectoryTree.FileSelected) -> None:
         path = event.path
         parent_dir = path.parent
         self.playlist = sorted([p for p in parent_dir.iterdir() if p.suffix.lower() in AUDIO_EXTENSIONS])
+
+        # This is a new playlist, so clear the "original" to avoid conflicts.
+        self.original_playlist = []
+
+        if self.is_shuffled:
+            # If shuffle mode is already on, shuffle this new playlist immediately.
+            # This is like toggling shuffle on for this new playlist.
+            self.original_playlist = self.playlist[:]  # Save sorted state for un-shuffling
+            current_song = path
+            rest_of_playlist = [p for p in self.playlist if p != current_song]
+            random.shuffle(rest_of_playlist)
+            self.playlist = [current_song] + rest_of_playlist
+
         try:
             self.current_track_index = self.playlist.index(path)
             self.play_track(path)
@@ -253,8 +305,9 @@ class GlyphixApp(App):
         elif event.button.id == "play_pause_button": self.action_play_pause()
         elif event.button.id == "next_button": self.action_next_track()
         elif event.button.id == "prev_button": self.action_prev_track()
-        else:
-            self.bell()
+        elif event.button.id == "shuffle_button": self.action_toggle_shuffle()
+        elif event.button.id == "loop_button": self.action_toggle_repeat()
+        else: self.bell()
 
     def set_active_tab(self, tab: FolderTab) -> None:
         for t in self.query(FolderTab): t.remove_class("active")
