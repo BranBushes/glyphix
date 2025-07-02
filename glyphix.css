@@ -112,7 +112,17 @@ Right Panel: Player & Lyrics/Queue
 #lyrics_queue_panel {
     height: 1fr; /* Takes up the remaining vertical space */
     margin-top: 1;
-    content-align: center middle;
+}
+
+/* NEW: Style for the scrollable lyrics container */
+#lyrics_container {
+    height: 1fr;
+    overflow-y: scroll;
+}
+
+/* NEW: Ensure the text inside the lyrics panel wraps correctly */
+.lyrics-text {
+    width: 100%;
 }
 
 /*
@@ -145,7 +155,7 @@ Widgets: Controls & Slider
 #music_controls Button:focus {
     background: transparent;
     color: #ff4500;
-    min-width: 5;
+    max-width: 5;
     height: 3;
 }
 
@@ -154,6 +164,8 @@ Widgets: Controls & Slider
     /* A semi-transparent red background indicates the "on" state */
     background: #ff4500;
     color: #ff4500;
+    max-width: 5;
+    height: 3;
 }
 
 /*
